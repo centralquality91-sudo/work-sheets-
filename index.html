@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Registry System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #0f4c81; 
+            --primary-hover: #0a365c;
+            --bg-body: #f4f7f9;
+            --bg-card: #ffffff;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --border-color: #e1e4e8;
+            --table-header: #f8f9fa;
+            --success: #28a745;
+        }
+
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .header-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        h1 { margin: 0; color: var(--primary); font-size: 1.5rem; font-weight: 600; }
+
+        .btn-qr { background: var(--text-main); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+
+        #saveIndicator { background: var(--success); color: white; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; opacity: 0; transition: opacity 0.3s ease; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 30px; }
+        .tab-btn { padding: 10px 20px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; color: var(--text-muted); }
+        .tab-btn.active { background: var(--primary); color: white; }
+
+        .page { display: none; }
+        .page.active { display: block; }
+
+        .form-group { display: flex; gap: 15px; align-items: center; background: var(--bg-body); padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid var(--border-color); flex-wrap: wrap; }
+        .input-block { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+        
+        .btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; height: 42px; margin-top: auto; }
+
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { padding: 14px 16px; border: 1px solid var(--border-color); vertical-align: top; word-wrap: break-word; }
+        th { background: var(--table-header); }
+
+        [contenteditable="true"] { background: #fafbfc; min-height: 40px; border: 1px dashed #ccc; padding: 5px; }
+
+        .img-preview { max-width: 100px; display: block; margin-top: 5px; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; max-width: 500px; width: 90%; text-align: center; }
+        #liveVideo { width: 100%; background: #000; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-area">
+            <h1>Register System</h1>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div id="saveIndicator">✓ Saved</div>
+                <button class="btn-qr" onclick="openQrModal()">📱 QR Link</button>
+            </div>
+        </div>
+
+        <div class="tabs" id="navigationTabs">
+            <button class="tab-btn active" id="btn-entry" onclick="switchTab('entry')">1. Registration</button>
+            <button class="tab-btn" id="btn-output" onclick="promptAdmin()">2. Master Dashboard</button>
+        </div>
+
+        <div id="page-entry" class="page active">
+            <div class="form-group">
+                <div class="input-block">
+                    <label>Category</label>
+                    <select id="regCategory"><option>Job No</option><option>Tool</option><option>General</option></select>
+                </div>
+                <div class="input-block">
+                    <label>ID / Number</label>
+                    <input type="text" id="regId" placeholder="Enter ID...">
+                </div>
+                <button class="btn" onclick="createOrLoadRecord()">Load / Create</button>
+            </div>
+            <div id="entryWorkspace" style="display: none;">
+                <table>
+                    <thead><tr><th>ID</th><th>Detail</th><th>Photo</th><th>Remark</th></tr></thead>
+                    <tbody id="entryTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="page-output" class="page">
+            <div class="form-group">
+                <div class="input-block">
+                    <label>View Registered Item</label>
+                    <select id="outputSelect" onchange="renderOutputTable(this.value)"></select>
+                </div>
+            </div>
+            <table>
+                <thead><tr><th>ID</th><th>Detail</th><th>Photo</th><th>Remark</th></tr></thead>
+                <tbody id="outputTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="cameraModal" class="modal-overlay">
+        <div class="modal-content">
+            <video id="liveVideo" autoplay playsinline></video>
+            <button class="btn" onclick="takeSnapshot()">Snap & Save</button>
+            <button class="btn" style="background:#dc3545" onclick="closeCameraModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        let database = { "Job No": {}, "Tool": {}, "General": {} };
+        let currentActiveRecord = { category: "", id: "" };
+
+        function switchTab(tab) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + tab).classList.add('active');
+        }
+
+        function promptAdmin() {
+            const pass = prompt("Enter Admin Password:");
+            if (pass === "admin123") {
+                switchTab('output');
+                updateOutputDropdown();
+            } else {
+                alert("Access Denied!");
+            }
+        }
+
+        function createOrLoadRecord() {
+            const category = document.getElementById('regCategory').value;
+            const id = document.getElementById('regId').value.trim();
+            if(!id) return alert("Enter ID");
+            
+            if(!database[category][id]) database[category][id] = { detail: "", photoSrc: "", remark: "" };
+            currentActiveRecord = { category, id };
+            
+            document.getElementById('entryWorkspace').style.display = "block";
+            document.getElementById('entryTableBody').innerHTML = `<tr>
+                <td>${id}</td>
+                <td contenteditable="true" id="cellDetail" oninput="autoSave()">${database[category][id].detail}</td>
+                <td>
+                    <button onclick="openCameraModal()">📷 Camera</button>
+                    <div id="imgContainer">${database[category][id].photoSrc ? `<img src="${database[category][id].photoSrc}" class="img-preview">` : ''}</div>
+                </td>
+                <td contenteditable="true" id="cellRemark" oninput="autoSave()">${database[category][id].remark}</td>
+            </tr>`;
+        }
+
+        function autoSave() {
+            const { category, id } = currentActiveRecord;
+            database[category][id].detail = document.getElementById('cellDetail').innerText;
+            database[category][id].remark = document.getElementById('cellRemark').innerText;
+            document.getElementById('saveIndicator').style.opacity = '1';
+            setTimeout(() => document.getElementById('saveIndicator').style.opacity = '0', 1000);
+        }
+
+        function openCameraModal() {
+            document.getElementById('cameraModal').style.display = 'flex';
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => document.getElementById('liveVideo').srcObject = stream);
+        }
+
+        function closeCameraModal() {
+            document.getElementById('cameraModal').style.display = 'none';
+            document.getElementById('liveVideo').srcObject.getTracks().forEach(t => t.stop());
+        }
+
+        function takeSnapshot() {
+            const video = document.getElementById('liveVideo');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const imgData = canvas.toDataURL('image/jpeg');
+            document.getElementById('imgContainer').innerHTML = `<img src="${imgData}" class="img-preview">`;
+            database[currentActiveRecord.category][currentActiveRecord.id].photoSrc = imgData;
+            closeCameraModal();
+        }
+
+        function updateOutputDropdown() {
+            const select = document.getElementById('outputSelect');
+            select.innerHTML = '<option>Select...</option>';
+            for(let cat in database) {
+                for(let id in database[cat]) {
+                    select.innerHTML += `<option value="${cat}|||${id}">${id} (${cat})</option>`;
+                }
+            }
+        }
+
+        function renderOutputTable(val) {
+            const [cat, id] = val.split('|||');
+            const d = database[cat][id];
+            document.getElementById('outputTableBody').innerHTML = `<tr><td>${id}</td><td>${d.detail}</td><td><img src="${d.photoSrc}" class="img-preview"></td><td>${d.remark}</td></tr>`;
+        }
+    </script>
+</body>
+</html>
